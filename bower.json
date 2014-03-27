@@ -1,0 +1,29 @@
+{
+  "name": "mostdoc",
+  "version": "0.0.1",
+  "description": "literate programming",
+  "main": "mostdoc.js",
+  "moduleType": [
+    "amd",
+    "globals",
+    "node"
+  ],
+  "keywords": [
+    "literate",
+    "programming"
+  ],
+  "authors": [
+    "Yurii Rashkovskii <yrashk@gmail.com>"
+  ],
+  "license": "Apache 2",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "jquery": "~2.1.0"
+  }
+}

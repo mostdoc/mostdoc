@@ -1,0 +1,590 @@
+<html>
+<head>
+<title>MostDoc</title>
+<script type="text/javascript" src="http://code.jquery.com/jquery-2.1.0.js"> </script>
+<link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
+<link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap-theme.min.css">
+<script src="http://netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js"></script>
+<script src="https://google-code-prettify.googlecode.com/svn/loader/run_prettify.js"></script>
+<script type="text/javascript" charset="utf-8" src="http://code.jquery.com/qunit/qunit-1.14.0.js"></script>
+<link rel="stylesheet" href="http://code.jquery.com/qunit/qunit-1.14.0.css" type="text/css" media="screen" title="no title" charset="utf-8">
+</head>
+<body>
+<div class="container">
+<h1>Introduction</h1>
+
+<p>MostDoc is a modern, web-enabled, lightweight approach to
+<a href="http://en.wikipedia.org/wiki/Literate_programming">literate programming</a>.</p>
+
+Core ideas behind MostDoc:
+
+<ul>
+  <li><h4>Presentation layer is based on HTML/CSS/JavaScript</h4>
+  Instead of using LaTeX or a custom syntax and/or HTML, MostDoc is built only on top
+  of common web standards, such as HTML, CSS and JavaScript. This gives its users
+  access to a vast array of presentation tools &amp; techniques, including dynamic ones.</li>
+  <li><h4>Presentation layer is available immediately, no tangling required</h4>
+  MostDoc programs require no tools to be used in order to produce the documentation,
+  since they are just HTML files, like this one.
+  </li>
+</ul>
+
+<h1>Concepts</h1>
+
+<h2>Input document</h2>
+
+<p>Input document is an arbitrary HTML document that contains zero or more code fragments.
+This document itself is an input document. MostDoc itself doesn't stipulate any
+particular layout structure or presentation techniques used in this document, it
+can be as simple as a plain HTML or document or as complex as <a href="http://lab.hakim.se/reveal-js/">slides</a>
+or a <a href="http://d3js.org/">dynamic presentation</a>.</p>
+
+<p>InputDocument is created from a DOM tree element, defaulting to window.document:</p>
+
+<code md-id="InputDocument" eval>
+var InputDocument = function(doc) {
+  this._doc = (doc || window.document);
+};
+InputDocument.prototype.doc = function() {
+  return this._doc;
+};
+</code>
+
+<code md-id="InputDocument tests" eval>
+  module("InputDocument");
+  test("initialization with a DOM element specified", function() {
+    var doc = window.document;
+    equal((new InputDocument(doc)).doc(), window.document);
+  });
+  test("initialization without a DOM element specified", function() {
+    equal((new InputDocument()).doc(), window.document);
+  });
+</code>
+
+<h2>Code fragment</h2>
+
+<p>Code fragment is a chunk of source code enclosed within a <em>code</em> tag, for example:</p>
+
+<pre class="prettyprint lang-c">
+&lt;code md-id="Main routine"&gt;
+ int main(int argc, char *argv[]) {
+    printf("Hello, world!\n");
+ }
+&lt;/code&gt;
+</pre>
+
+<p>A <code>CodeFragment</code> is constructed from an HTML element or DOM tree node:</p>
+
+<code md-id="CodeFragment" eval>
+var CodeFragment = function(node) {
+  if (typeof node.get == 'undefined')
+    this._node = node
+  else
+    this._node = node.get(0);
+};
+CodeFragment.prototype.node = function() {
+  return this._node;
+};
+CodeFragment.prototype.element = function() {
+  return $(this.node());
+};
+</code>
+
+<code md-id="CodeFragment tests" eval>
+  module("CodeFragment");
+  test("initialization with an HTML element", function() {
+    var el = $('&lt;code&gt;&lt;/code&gt');
+    ok((new CodeFragment(el)).element().is(el), "passed element should equate returned one");
+    ok((new CodeFragment(el)).node() == el.get(0), "passed element's node should equated returned one");
+  });
+  test("initialization with a DOM tree node", function() {
+    var node = $('&lt;code&gt;&lt;/code&gt').get(0);
+    ok((new CodeFragment(node)).node() == node);
+    ok((new CodeFragment(node)).element().is($(node)));
+  });
+</code>
+
+<p>Supported attributes:</p>
+
+<ul>
+  <li><em>md-id</em>: defines fragments's name, can be used in <a href="#code-ref"><em>md-ref</em></a>
+  <code md-id="CodeFragment" eval>
+    CodeFragment.prototype.name = function() {
+      return (this.element().attr("md-id") || this.element().attr("md-file"));
+    };
+  </code>
+  <code md-id="CodeFragment tests" eval>
+    module("CodeFragment");
+    test("name extraction", function() {
+      var el = $('&lt;code md-id="CodeFragment test: name extraction"&gt;test&lt/code&gt');
+      equal((new CodeFragment(el)).name(), "CodeFragment test: name extraction");
+      var el = $('&lt;code&gt;test&lt/code&gt');
+      equal((new CodeFragment(el)).name(), undefined);
+   });
+  </code>
+  </li>
+  <li><em>md-file</em>: defines a file name to output given fragment to. Unless <em>md-id</em> is also specified,
+      it is used as a value for <em>md-id</em> as well. Only fragments with <em>md-file</em> specified are used to
+      as entry points for product files generation.
+    <code md-id="CodeFragment" eval>
+      CodeFragment.prototype.file = function() {
+        return (this.element().attr("md-file") || false);
+      };
+    </code>
+    <code md-id="CodeFragment tests" eval>
+      module("CodeFragment");
+      test("file name extraction", function() {
+        var el = $('&lt;code md-file="test_file.js"&gt;test&lt/code&gt');
+        equal((new CodeFragment(el)).file(), "test_file.js");
+        var el = $('&lt;code md-id="test_file.js"&gt;test&lt/code&gt');
+        equal((new CodeFragment(el)).file(), false);
+      });
+      test("md-file and md-id", function() {
+        var el = $('&lt;code md-file="test_file.js"&gt;test&lt/code&gt');
+        equal((new CodeFragment(el)).name(), "test_file.js");
+        equal((new CodeFragment(el)).file(), "test_file.js");
+        var el = $('&lt;code md-id="test file" md-file="test_file.js"&gt;test&lt/code&gt');
+        equal((new CodeFragment(el)).name(), "test file");
+        equal((new CodeFragment(el)).file(), "test_file.js");
+      });
+    </code>
+  </li>
+  <li><em>md-lang</em>: defines fragments's programming language. Not used by the product generation process (at least,
+  not yet), but useful for enabling pretty-printing in the presentation layer
+  <code md-id="CodeFragment" eval>
+    CodeFragment.prototype.lang = function() {
+      return this.element().attr("md-lang");
+    };
+  </code>
+  <code md-id="CodeFragment tests" eval>
+    module("CodeFragment");
+    test("language extraction", function() {
+      var el = $('&lt;code md-lang="c" md-id="CodeFragment test: name extraction"&gt;i++;&lt/code&gt');
+      equal((new CodeFragment(el)).lang(), "c");
+      var el = $('&lt;code md-id="CodeFragment test: name extraction"&gt;i++;&lt/code&gt');
+      equal((new CodeFragment(el)).lang(), undefined);
+   });
+  </code>
+</li>
+
+</ul>
+
+<p>Naturally, the most important part of any code fragment is the text within. In order to extract it,
+we'll traverse children nodes.</p>
+
+<code md-id="CodeFragment" eval>
+CodeFragment.prototype.data = function() {
+  var acc = [];
+  var childNodes = this.node().childNodes;
+  for (var i in childNodes) {
+    var node = childNodes[i];
+    <code md-ref="CodeFragment.data() process node"></code>
+  }
+</code>
+
+<p>All collected pieces of the code fragment are added to the accumulator variable
+<em>acc</em>, processed and the accumulator is returned:</p>
+
+<code md-id="CodeFragment" eval>
+  if (acc.length > 0) {
+    <code md-ref="CodeFragment.data() process acc"></code>
+  }
+  return acc;
+};
+</code>
+
+<p>If the node type is <em>TEXT_NODE</em>, its value is added to the result:</p>
+
+<code md-id="CodeFragment.data() process node">
+if (node.nodeType == Node.TEXT_NODE) {
+  acc.push($(node).text());
+}
+</code>
+
+<code md-id="CodeFragment tests" eval>
+module("CodeFragment");
+test("simple code extraction", function() {
+  var el = $('&lt;code&gt;&lt;/code&gt');
+  deepEqual((new CodeFragment(el)).data(), []);
+  var el = $('&lt;code&gt;"Hello, world!"&lt;/code&gt');
+  deepEqual((new CodeFragment(el)).data(), ["\"Hello, world!\""]);
+});
+</code>
+
+<h3>Code fragment text preparation</h3>
+
+<p>It is common for code fragments to start at a newline and end with one for
+readability purposes. This formatting</p>
+
+<pre class="prettyprint lang-c">
+&lt;code md-id="Main routine"&gt;
+ int main(int argc, char *argv[]) {
+    printf("Hello, world!\n");
+ }
+&lt;/code&gt;
+</pre>
+
+<p>looks better than this:</p>
+
+<pre class="prettyprint lang-c">
+&lt;code md-id="Main routine"&gt;int main(int argc, char *argv[]) {
+  printf("Hello, world!\n");
+}&lt;/code&gt;
+</pre>
+
+<p>However, if we don't process the text extracted from the first example,
+it will keep adding superfluous newlines to the product files. To avoid this,
+leading and trailing newlines with their leading spaces are eliminated:</p>
+
+<code md-id="CodeFragment.data() process acc">
+var first_text, last_text;
+for (var i in acc) {
+  if (typeof acc[i] == 'string') {
+    first_text = i;
+    break;
+  }
+}
+for (var i in acc) {
+  if (typeof acc[acc.length - 1 - i] == 'string') {
+    last_text = acc.length - 1 - i;
+    break;
+  }
+}
+if (typeof first_text != 'undefined')
+  acc[first_text] = acc[first_text].replace(/^\s*\n/,"");
+if (typeof last_text != 'undefined')
+  acc[last_text] = acc[last_text].replace(/\s*$/,"");
+</code>
+
+<code md-id="CodeFragment tests" eval>
+module("CodeFragment");
+test("code with newlines extraction", function() {
+  var el = $('&lt;code&gt;   \n"Hello, world!"\n   \n&lt;/code&gt');
+  deepEqual((new CodeFragment(el)).data(), ["\"Hello, world!\""]);
+  var el = $('&lt;code&gt;   \n"Hello, world!"   \n&lt;/code&gt');
+  deepEqual((new CodeFragment(el)).data(), ["\"Hello, world!\""]);
+  var el = $('&lt;code&gt;   \n"Hello, world!"   &lt;/code&gt');
+  deepEqual((new CodeFragment(el)).data(), ["\"Hello, world!\""]);
+});
+</code>
+
+
+<h3><a id="code-ref"></a>Code fragment reference</h3>
+
+<p>Code fragment references are very important in literate programming. Code fragment
+reference is a <em>code</em> tag with a <em>md-ref</em> attribute specified. It allows
+to include code fragments into other fragments. For example:</p>
+
+<pre class="prettyprint lang-c">
+&lt;code md-id="Main routine"&gt;
+ int main(int argc, char *argv[]) {
+    printf("Hello, world!\n");
+ }
+&lt;/code&gt;
+&lt;code md-file="hello_world.c"&gt;
+ &lt;code md-ref="Main routine"&gt;&lt;/code&gt;
+&lt;/code&gt;
+</pre>
+
+<p>In the above example, <em>hello_world.c</em> fragment will include the <em>Main routine</em>
+fragment upon product file generation.</p>
+
+<p>Continuing the node processing in <code>CodeFragment.data()</code>, if the node type is
+<em>ELEMENT_NODE</em>, the tag name is <em>code</em> and <em>md-ref</em> is specified, a
+reference object is added to the result:</p>
+
+<code md-id="CodeFragment.data() process node">
+if (node.nodeType == Node.ELEMENT_NODE && node.tagName == 'CODE') {
+  var dep = {reference: $(node).attr("md-ref")};
+  acc.push(dep);
+}
+</code>
+
+<code md-id="CodeFragment tests" eval>
+module("CodeFragment");
+test("code with a referenced fragment extraction", function() {
+  var el = $('&lt;code&gt;"Hello, &lt;code md-ref="world"&gt;&lt;/code&gt"&lt;/code&gt');
+  deepEqual((new CodeFragment(el)).data(), ["\"Hello, ", {reference: "world"}, "\""]);
+});
+</code>
+
+<h2>Product files</h2>
+
+<p>Every input document that has at least one code fragment with an <em>md-file</em>
+attribute specified, can be used to generate product files.</p>
+
+<p>As a first step in this process, all code fragments should be filtered. In
+order to simplify further process, only code fragments with <em>md-id</em> or
+<em>md-file</em> specified are chosen.</p>
+
+<code md-id="InputDocument" eval>
+InputDocument.prototype.fragments = function() {
+  return $(this.doc()).find("code[md-id],code[md-file]");
+};
+</code>
+
+<code md-id="InputDocument tests" eval>
+module("InputDocument");
+test("fragment extraction", function() {
+  var doc = document.implementation.createHTMLDocument();
+  deepEqual((new InputDocument(doc)).fragments().toArray(), []);
+  var doc = document.implementation.createHTMLDocument();
+  $(doc.body).append("&lt;div&gt;&lt;code md-id=\"1\"&gt;1&lt;/code&gt;&lt;code md-file=\"2\"&gt;2&lt;/code&gt;&lt;/div&gt;");
+  equal((new InputDocument(doc)).fragments().toArray().length, 2);
+  ok((new InputDocument(doc)).fragments().is($(doc).find("code")));
+});
+</code>
+
+<p>As a second step, all entry point names (code fragments with <em>md-file</em> attribute specified)
+need to be filtered.</p>
+
+<code md-id="InputDocument" eval>
+InputDocument.prototype.files = function() {
+  return $(this.doc()).find("code[md-file]").map(function(i, e) {
+    return $(e).attr('md-file');
+  }).toArray();
+};
+</code>
+
+<code md-id="InputDocument tests" eval>
+module("InputDocument");
+test("files extraction", function() {
+  var doc = document.implementation.createHTMLDocument();
+  deepEqual((new InputDocument(doc)).files(), []);
+  var doc = document.implementation.createHTMLDocument();
+  $(doc.body).append("&lt;div&gt;&lt;code md-id=\"1\"&gt;1&lt;/code&gt;&lt;code md-file=\"2\"&gt;2&lt;/code&gt;&lt;/div&gt;");
+  equal((new InputDocument(doc)).files().length, 1);
+  deepEqual((new InputDocument(doc)).files(), ["2"]);
+});
+</code>
+
+<p>After the list of files can be determined, every file's content can be extracted using
+<code>produce()</code> function:</p>
+
+<code md-id="InputDocument" eval>
+InputDocument.prototype.produce = function(file) {
+  var _doc = this.doc();
+  var processFragment = function(e) {
+    var fragment = new CodeFragment(e);
+    var result = [];
+    fragment.data().forEach(function(d) {
+      if (typeof d == 'string') {
+        result.push(d);
+      } else if (typeof d == 'object') {
+        if (typeof d.reference != 'undefined') {
+          $(_doc).find("code[md-id=\"" + d.reference + "\"]").each(function (i, e1) {
+            result = result.concat(processFragment(e1));
+          });
+        }
+      }
+    });
+    return result.join("");
+  }
+  var acc = "";
+  $(_doc).find("code[md-file=\"" + file + "\"]").each(function(i, e) {
+   acc += processFragment(e);
+  });
+  return acc;
+};
+</code>
+
+<code md-id="InputDocument tests" eval>
+module("InputDocument");
+test("simple file producing", function() {
+  var doc = document.implementation.createHTMLDocument();
+  $(doc.body).append("&lt;code md-file=\"file_1\"&gt;test&lt;/code&gt;");
+  deepEqual((new InputDocument(doc)).produce("file_1"), "test");
+});
+test("appending file producing", function() {
+  var doc = document.implementation.createHTMLDocument();
+  $(doc.body).append("&lt;code md-file=\"file_1\"&gt;test&lt;/code&gt;&lt;code md-file=\"file_1\"&gt; it&lt;/code&gt;");
+  deepEqual((new InputDocument(doc)).produce("file_1"), "test it");
+});
+test("file producing with reference", function() {
+  var doc = document.implementation.createHTMLDocument();
+  $(doc.body).append("&lt;code md-file=\"file_1\"&gt;&lt;code md-ref=\"content\"&gt;&lt/code&gt;&lt;/code&gt;&lt;code md-id=\"content\"&gt;test it&lt;/code&gt;");
+  deepEqual((new InputDocument(doc)).produce("file_1"), "test it");
+});
+test("file producing with reference to appending fragment", function() {
+  var doc = document.implementation.createHTMLDocument();
+  $(doc.body).append("&lt;code md-file=\"file_1\"&gt;&lt;code md-ref=\"content\"&gt;&lt/code&gt;&lt;/code&gt;&lt;code md-id=\"content\"&gt;test it&lt;/code&gt;&lt;code md-id=\"content\"&gt; twice&lt;/code&gt;");
+  deepEqual((new InputDocument(doc)).produce("file_1"), "test it twice");
+});
+
+</code>
+
+<h1>Command line utility</h1>
+
+<p>Current version of MostDoc contains of a very minimal "tangling" tool, implemented
+in JavaScript and running using <a href="http://nodejs.org">Node.JS</a>.</p>
+
+<p>The utility is invoked like this: <pre>$ node mostdoc.js index.html</pre></p>
+
+<p>This part of the functionality will be only invoked if the file is called directly as shown above.</p>
+
+<code md-id="Command line workflow">
+if (typeof require != 'undefined' && require.main === module) {
+  <code md-ref="Package requirements"></code>
+</code>
+
+<p>On the implementation side, there are three steps involved:</p>
+
+<ol>
+  <li>
+    <p>This command line utility takes HTML filename to process  (<em>input document</em>)
+    as a last argument:</p>
+
+    <code md-id="Command line workflow">
+    var file = process.argv.slice(-1)[0];
+    </code>
+  </li>
+  <li><a href="#parse-input">Parse input document into a DOM tree</a>
+    <code md-id="Command line workflow">
+    parseInputDocument(file)
+    </code>
+</li>
+  <li><a href="#product-files">Generate product files</a>
+  <code md-id="Command line workflow">
+  .then(function(doc, window) {
+    var files = doc.files();
+    for (var i in files) {
+      var file = files[i];
+      fs.writeFileSync(file, doc.produce(file));
+    }
+    window.close()
+  })
+  </code>
+</li>
+</ol>
+
+<code md-id="Command line workflow">
+};
+</code>
+
+<p>The above code uses promises as implemented in the <a href="https://github.com/kriskowal/q">q</a>
+library. It is important to understand what it does to understand how MostDoc's code
+is composed.</p>
+
+<code md-id="Package requirements">
+var q = require('q');
+</code>
+
+<p>Also, for working with the file systems, it requires <em>fs</em> package, included with Node.JS:</p>
+
+<code md-id="Package requirements">
+  var fs = require('fs');
+</code>
+
+
+
+<h2><a id="parse-input"></a>Parsing input document</h2>
+
+<p>MostDoc uses <a href="https://www.npmjs.org/package/jsdom">jsdom</a> library
+to process input document. Nothing complex is done here, the <code>doc</code> argument
+can be either an HTML as a string, a URL or a filename. The function itself returns a promise
+that will be eventually resolved with an HTML document value.</p>
+
+<code md-id="Parsing input document">
+var parseInputDocument = function(doc) {
+  var dfd = q.defer();
+  var jsdom = require("jsdom");
+  jsdom.env(doc, {SkipExternalResources: true}, function (errors, window) {
+    GLOBAL.$ = require('jquery')(window);
+    GLOBAL.Node = GLOBAL.Node || {
+      ELEMENT_NODE: 1,
+      ATTRIBUTE_NODE: 2,
+      TEXT_NODE: 3
+    };
+    var input_doc = new InputDocument(window.document);
+    dfd.resolve(input_doc, window);
+  });
+  return dfd.promise;
+};
+</code>
+
+<h1>Appendix A. Main source file</h1>
+<code md-file="mostdoc.js">
+(function () {
+  'use strict';
+
+  <code md-ref="InputDocument"></code>
+  <code md-ref="CodeFragment"></code>
+
+  <code md-ref="Parsing input document"></code>
+  <code md-ref="Command line workflow"></code>
+
+
+}());
+</code>
+
+<h1>Appendix B. Test Suite</h1>
+
+<p>This is an example of using source code defined by this document to run tests
+on the application itself. MostDoc itself doesn't provide any direct support for
+this, but this document itself scans for all code fragments that have the `eval`
+attribute defined. This is only possible for JavaScript (still, an interesting
+feature for client-side JavaScript applications).</p>
+
+<div id="qunit"></div><div id="qunit-fixture"></div>
+
+</div>
+<script type="text/javascript" charset="utf-8">
+  $(document).ready(function () {
+    // TODO: this presentation stuff below should get extracted later on
+
+    // remove leading newline and trailing spaces+newlines
+    $('code[md-id],code[md-file]').each(function (i, e) {
+      var textNodes = $(e).contents().filter(function() {
+        return this.nodeType === Node.TEXT_NODE;
+      });
+      textNodes[0].nodeValue = $(textNodes[0]).text().replace(/^\n*/,"");
+      textNodes[textNodes.length - 1].nodeValue = $(textNodes[textNodes.length - 1]).text().replace(/\s*\n*$/,"");
+    });
+    // remove shared indentation
+   $('code[md-id],code[md-file]').each(function (i, e) {
+      var textNodes = $(e).contents().filter(function() {
+        return this.nodeType === Node.TEXT_NODE;
+      });
+      var lines = [];
+      textNodes.each(function(i,n) { lines = lines.concat($(n).text().split("\n")); });
+      var spaces = Array(Math.min.apply(this, lines.map(function(l) { return l.match(/^\s*/)[0].length }))+1).join(" ");
+      textNodes.each(function(i,n) {
+        n.nodeValue = textNodes[i].nodeValue.replace(new RegExp("^" + spaces,"gm"),"")
+      });
+    });
+    $('code[md-id],code[md-file]').wrap("<pre class=\"prettyprint\"></pre>");
+    $('code[md-id],code[md-file]').each(function (i, e) {
+      $(e).parent("pre").tooltip({title: $(e).attr("md-id") || $(e).attr("md-file")});
+    });
+    $('code[md-lang]').each(function (i, e) {
+       $(e).addClass("language-" + $(e).attr("md-lang"));
+    });
+    // evaluate `eval` code fragments (for tests)
+    var toEval = $('code[eval]').map(function(i,e) {
+      var e = $(e).clone();
+      while ($(e).find('code[md-ref]').length > 0) {
+        $(e).find('code[md-ref]').each(function (i,el) {
+          var id = $(el).attr('md-ref');
+          $(el).replaceWith($('code[md-id="' + id +'"]').clone());
+        });
+      }
+      return $(e).text() ;
+    }).toArray().join("\n");
+    $('body').append("\<script type=\"text/javascript\"\>\n" + toEval + "\n\</script\>");
+    $('code[md-ref]').each(function (i, e) {
+      var e = $(e);
+      $(e).wrap("<div class=\"nocode btn btn-xs btn-info md-ref\">" + e.attr("md-ref") + "</div>")
+    });
+
+  })
+</script>
+<style type="text/css" media="screen">
+.md-ref {
+}
+pre.prettyprint {
+  padding: 5px;
+  overflow:auto; max-width:100%;
+}
+</style>
+</body>
+</html>

@@ -1,0 +1,30 @@
+{
+  "name": "mostdoc",
+  "version": "0.0.1",
+  "description": "literate programming",
+  "main": "mostdoc.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "literate",
+    "programming"
+  ],
+  "author": "Yurii Rashkovskii <yrashk@gmail.com>",
+  "license": "Apache 2",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mostdoc/mostdoc"
+  },
+  "bugs": {
+    "url": "https://github.com/mostdoc/mostdoc/issues"
+  },
+  "dependencies": {
+    "jsdom": "~0.10.3",
+    "q": "~1.0.1",
+    "jquery": "~2.1.0"
+  },
+  "devDependencies": {
+    "qunit": "~0.6.2"
+  }
+}
