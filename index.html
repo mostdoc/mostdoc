@@ -585,6 +585,15 @@ feature for client-side JavaScript applications).</p>
       var e = $(e);
       $(e).wrap("<div class=\"nocode btn btn-xs btn-info md-ref\">" + e.attr("md-ref") + "</div>")
     });
+    $('.md-ref').click(function(e) {
+      var ref = $(e.target).text();
+      $('code').parent().css('background-color', 'none');
+      $('code[md-file="' + ref + '"],code[md-id="' + ref + '"]').parent().css('background-color', 'lightyellow');
+      $('html, body').animate({
+        scrollTop: $('code[md-file="' + ref + '"],code[md-id="' + ref + '"]').offset().top
+      }, 1000);
+
+    });
 
   })
 </script>
